@@ -1,0 +1,23 @@
+# S0.2.4: ESP32 Bluetooth proxy for SwitchBot buttons. Flash 1 or 2 and place centrally.
+substitutions:
+  name: bt-proxy-1
+  api_key: !secret api_key_bt_proxy_1
+
+esphome:
+  name: ${name}
+  friendly_name: Bluetooth proxy 1
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+packages:
+  base: !include common/base.yaml
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  active: true

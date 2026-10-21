@@ -1,0 +1,22 @@
+[Unit]
+Description=Assist voice satellite for the Show device
+Wants=network-online.target home-show-wakeword.service
+After=network-online.target home-show-wakeword.service
+
+[Service]
+User=@USER@
+EnvironmentFile=/etc/home-show.env
+WorkingDirectory=/opt/home-show/wyoming-satellite
+ExecStart=/bin/bash -c 'exec script/run \
+  --name "$SATELLITE_NAME" \
+  --uri tcp://0.0.0.0:10700 \
+  --mic-command "arecord -D $MIC_DEVICE -r 16000 -c 1 -f S16_LE -t raw" \
+  --snd-command "aplay -D $SND_DEVICE -r 22050 -c 1 -f S16_LE -t raw" \
+  --wake-uri tcp://127.0.0.1:10400 --wake-word-name "$WAKE_WORD" \
+  --awake-wav sounds/awake.wav --done-wav sounds/done.wav \
+  --timer-finished-wav sounds/timer_finished.wav --timer-finished-wav-repeat 5 0.5'
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

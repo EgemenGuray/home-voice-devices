@@ -1,0 +1,22 @@
+# Shared by every device. Devices live on the IoT network and talk only to Home Assistant.
+# The API is encrypted per device; OTA needs a password; no fallback hotspot and no web server.
+wifi:
+  ssid: !secret wifi_iot_ssid
+  password: !secret wifi_iot_password
+  power_save_mode: none
+  fast_connect: false
+
+api:
+  encryption:
+    key: ${api_key}
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+logger:
+  level: INFO
+
+time:
+  - platform: homeassistant
+    id: ha_time

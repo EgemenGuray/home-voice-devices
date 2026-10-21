@@ -1,0 +1,13 @@
+[Unit]
+Description=Local wake word for the Show device
+After=network-online.target
+
+[Service]
+User=@USER@
+WorkingDirectory=/opt/home-show/wyoming-openwakeword
+ExecStart=/opt/home-show/wyoming-openwakeword/script/run --uri tcp://127.0.0.1:10400
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

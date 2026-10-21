@@ -1,0 +1,26 @@
+name: validate
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  esphome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install esphome
+      - name: esphome config
+        working-directory: esphome
+        run: |
+          # Throwaway keys so validation passes; the real ones never leave the vault.
+          sed "s|REPLACE_WITH_openssl_rand_base64_32|$(openssl rand -base64 32)|" secrets.example.yaml > secrets.yaml
+          for f in dot-clock.yaml bluetooth-proxy.yaml; do esphome config "$f" > /dev/null && echo "$f ok"; done
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -S warning pi-show/*.sh

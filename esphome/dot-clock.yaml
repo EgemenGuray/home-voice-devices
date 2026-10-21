@@ -1,0 +1,351 @@
+# S0.7.1: Dot-style voice satellite with an LED dot-matrix clock (replaces Echo Dot with Clock).
+# ESP32-S3 (16 MB flash, 8 MB PSRAM) + ReSpeaker XVF3800 over I2S + I2S class-D amp (MAX98357A)
+# + four MAX7219 8x8 modules (32x8) behind fabric.
+# It is a thin satellite: wake word on the device, everything else in HA Assist on the hub Mac.
+# Pins are for a generic ESP32-S3 DevKitC-1; change the substitutions to match your wiring.
+
+substitutions:
+  name: dot-kitchen
+  friendly_name: Kitchen voice
+  api_key: !secret api_key_dot_kitchen
+  # XVF3800 I2S (the XVF3800 is the I2S clock master)
+  mic_bclk: GPIO8
+  mic_lrclk: GPIO7
+  mic_din: GPIO44
+  # Amplifier I2S (ESP32 is master)
+  amp_bclk: GPIO16
+  amp_lrclk: GPIO15
+  amp_dout: GPIO17
+  amp_sd: GPIO18
+  # MAX7219 matrix (SPI)
+  mx_clk: GPIO12
+  mx_mosi: GPIO11
+  mx_cs: GPIO10
+  # Action button and the XVF3800 mic-mute LED
+  button_pin: GPIO0
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.5.0
+  on_boot:
+    priority: -100
+    then:
+      - lambda: id(ui_mode) = 0;
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  cpu_frequency: 240MHz
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DATA_CACHE_64KB: "y"
+      CONFIG_ESP32S3_DATA_CACHE_LINE_64B: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+packages:
+  base: !include common/base.yaml
+
+globals:
+  # 0 = clock, 1 = listening, 2 = thinking, 3 = replying, 4 = timer, 5 = error, 6 = muted
+  - id: ui_mode
+    type: int
+    initial_value: "0"
+  - id: timer_seconds_left
+    type: int
+    initial_value: "0"
+  - id: timer_label
+    type: std::string
+    initial_value: '""'
+
+i2s_audio:
+  - id: i2s_mic
+    i2s_lrclk_pin: ${mic_lrclk}
+    i2s_bclk_pin: ${mic_bclk}
+  - id: i2s_amp
+    i2s_lrclk_pin: ${amp_lrclk}
+    i2s_bclk_pin: ${amp_bclk}
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_audio_id: i2s_mic
+    i2s_din_pin: ${mic_din}
+    adc_type: external
+    i2s_mode: secondary
+    pdm: false
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    channel: left
+
+speaker:
+  - platform: i2s_audio
+    id: amp
+    i2s_audio_id: i2s_amp
+    i2s_dout_pin: ${amp_dout}
+    dac_type: external
+    sample_rate: 48000
+    bits_per_sample: 16bit
+    channel: mono
+    buffer_duration: 100ms
+  - platform: mixer
+    output_speaker: amp
+    num_channels: 1
+    source_speakers:
+      - id: announce_mixer_input
+        timeout: never
+      - id: media_mixer_input
+        timeout: never
+  - platform: resampler
+    id: media_resampling_speaker
+    output_speaker: media_mixer_input
+  - platform: resampler
+    id: announcement_resampling_speaker
+    output_speaker: announce_mixer_input
+
+media_player:
+  - platform: speaker
+    id: speaker_media_player
+    name: None
+    internal: false
+    buffer_size: 1000000
+    volume_initial: 0.5
+    volume_min: 0.1
+    announcement_pipeline:
+      speaker: announcement_resampling_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+    media_pipeline:
+      speaker: media_resampling_speaker
+      format: FLAC
+      sample_rate: 48000
+      num_channels: 1
+    files:
+      - id: timer_finished_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/timer_finished.flac
+      - id: wake_sound
+        file: https://github.com/esphome/home-assistant-voice-pe/raw/dev/sounds/wake_word_triggered.flac
+    on_announcement:
+      - mixer_speaker.apply_ducking:
+          id: media_mixer_input
+          decibel_reduction: 20
+          duration: 0.0s
+    on_idle:
+      - if:
+          condition:
+            not:
+              voice_assistant.is_running:
+          then:
+            - mixer_speaker.apply_ducking:
+                id: media_mixer_input
+                decibel_reduction: 0
+                duration: 1.0s
+
+micro_wake_word:
+  id: mww
+  microphone:
+    microphone: mic
+    channels: 0
+    gain_factor: 4
+  stop_after_detection: false
+  models:
+    # Replace with the custom wake word once trained (S0.6.2): a URL or local path to its .json manifest.
+    - model: okay_nabu
+      id: okay_nabu
+    - model: https://github.com/kahrendt/microWakeWord/releases/download/stop/stop.json
+      id: stop
+      internal: true
+  vad:
+  on_wake_word_detected:
+    - if:
+        condition:
+          switch.is_off: mic_mute
+        then:
+          - voice_assistant.start:
+              wake_word: !lambda return wake_word;
+
+voice_assistant:
+  id: va
+  microphone:
+    microphone: mic
+    channels: 0
+  media_player: speaker_media_player
+  micro_wake_word: mww
+  use_wake_word: false
+  noise_suppression_level: 0
+  auto_gain: 0 dbfs
+  volume_multiplier: 1
+  on_listening:
+    - lambda: id(ui_mode) = 1;
+  on_stt_vad_end:
+    - lambda: id(ui_mode) = 2;
+  on_tts_start:
+    - lambda: id(ui_mode) = 3;
+  on_end:
+    - wait_until:
+        not:
+          media_player.is_announcing:
+    - lambda: "id(ui_mode) = id(timer_seconds_left) > 0 ? 4 : 0;"
+  on_error:
+    - lambda: id(ui_mode) = 5;
+    - delay: 2s
+    - lambda: id(ui_mode) = 0;
+  on_client_connected:
+    - micro_wake_word.start:
+  on_client_disconnected:
+    - voice_assistant.stop:
+    - micro_wake_word.stop:
+  # Native Assist timers (S0.5.3): countdown on the matrix, chime when done.
+  on_timer_started:
+    - lambda: |-
+        id(timer_seconds_left) = timer.seconds_left;
+        id(timer_label) = timer.name;
+        id(ui_mode) = 4;
+  on_timer_updated:
+    - lambda: id(timer_seconds_left) = timer.seconds_left;
+  on_timer_tick:
+    - lambda: |-
+        int shortest = 0;
+        for (auto &t : timers) {
+          if (t.is_active && (shortest == 0 || (int) t.seconds_left < shortest)) shortest = t.seconds_left;
+        }
+        id(timer_seconds_left) = shortest;
+        if (id(ui_mode) == 0 && shortest > 0) id(ui_mode) = 4;
+  on_timer_cancelled:
+    - lambda: |-
+        id(timer_seconds_left) = 0;
+        if (id(ui_mode) == 4) id(ui_mode) = 0;
+  on_timer_finished:
+    - lambda: id(timer_seconds_left) = 0;
+    - repeat:
+        count: 5
+        then:
+          - media_player.speaker.play_on_device_media_file:
+              media_file: timer_finished_sound
+              announcement: true
+          - delay: 2s
+    - lambda: id(ui_mode) = 0;
+
+switch:
+  - platform: template
+    id: mic_mute
+    name: Mute microphone
+    icon: mdi:microphone-off
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    entity_category: config
+    on_turn_on:
+      - micro_wake_word.stop:
+      - voice_assistant.stop:
+      - lambda: id(ui_mode) = 6;
+    on_turn_off:
+      - micro_wake_word.start:
+      - lambda: id(ui_mode) = 0;
+  - platform: gpio
+    id: amp_enable
+    pin: ${amp_sd}
+    restore_mode: ALWAYS_ON
+    internal: true
+
+binary_sensor:
+  - platform: gpio
+    id: action_button
+    pin:
+      number: ${button_pin}
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_click:
+      - min_length: 50ms
+        max_length: 600ms
+        then:
+          - if:
+              condition:
+                voice_assistant.is_running:
+              then:
+                - voice_assistant.stop:
+              else:
+                - voice_assistant.start:
+      - min_length: 2s
+        max_length: 6s
+        then:
+          - switch.toggle: mic_mute
+
+number:
+  - platform: template
+    id: matrix_brightness
+    name: Display brightness
+    icon: mdi:brightness-6
+    entity_category: config
+    min_value: 0
+    max_value: 15
+    step: 1
+    initial_value: 4
+    restore_value: true
+    optimistic: true
+    set_action:
+      - lambda: id(matrix).intensity((int) x);
+
+spi:
+  clk_pin: ${mx_clk}
+  mosi_pin: ${mx_mosi}
+
+font:
+  - file: "gfonts://Silkscreen"
+    id: tiny
+    size: 8
+    glyphs: "0123456789:. -abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!?"
+
+display:
+  - platform: max7219digit
+    id: matrix
+    cs_pin: ${mx_cs}
+    num_chips: 4
+    intensity: 4
+    update_interval: 250ms
+    lambda: |-
+      static int frame = 0;
+      frame++;
+      switch (id(ui_mode)) {
+        case 1: {  // listening: breathing bar
+          int w = 4 + (frame % 8) * 3;
+          it.filled_rectangle((32 - w) / 2, 3, w, 2);
+          break;
+        }
+        case 2: {  // thinking: moving dots
+          for (int i = 0; i < 3; i++) it.filled_rectangle(((frame + i * 4) % 32), 3, 2, 2);
+          break;
+        }
+        case 3: {  // replying: equaliser
+          for (int x = 2; x < 30; x += 4) {
+            int h = 1 + ((frame * 7 + x * 3) % 7);
+            it.filled_rectangle(x, 8 - h, 2, h);
+          }
+          break;
+        }
+        case 4: {  // timer countdown mm:ss or h:mm
+          int s = id(timer_seconds_left);
+          if (s >= 3600) it.printf(16, 0, id(tiny), TextAlign::TOP_CENTER, "%d:%02d", s / 3600, (s % 3600) / 60);
+          else it.printf(16, 0, id(tiny), TextAlign::TOP_CENTER, "%02d:%02d", s / 60, s % 60);
+          break;
+        }
+        case 5:
+          it.print(16, 0, id(tiny), TextAlign::TOP_CENTER, "err");
+          break;
+        case 6:  // muted: a single dim dot
+          it.draw_pixel_at(31, 7);
+          [[fallthrough]];
+        default: {  // clock with a blinking colon
+          auto now = id(ha_time).now();
+          if (!now.is_valid()) { it.print(16, 0, id(tiny), TextAlign::TOP_CENTER, "--:--"); break; }
+          int h = now.hour % 12; if (h == 0) h = 12;
+          if (frame % 4 < 2) it.printf(16, 0, id(tiny), TextAlign::TOP_CENTER, "%d:%02d", h, now.minute);
+          else it.printf(16, 0, id(tiny), TextAlign::TOP_CENTER, "%d %02d", h, now.minute);
+        }
+      }
