@@ -1,5 +1,7 @@
 # Show-mini (S0.7.2): status
 
+The same in both setups: a v1 Assist satellite to HA on the hub Mac, which uses the Studio's speech services once one joins.
+
 Board: Waveshare ESP32-P4 3.4" round (800×800 MIPI-DSI, onboard mics with echo cancellation and a 2 W speaker).
 
 Not written yet on purpose. ESP32-P4 display and audio support in ESPHome depends on the exact panel driver, touch controller and codec on this board, and a config written without the board in hand would not boot. Next steps once the board arrives:
