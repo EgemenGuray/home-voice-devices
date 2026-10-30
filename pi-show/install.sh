@@ -11,6 +11,8 @@ ENV_FILE=/etc/home-show.env
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 : "${KIOSK_USER:=kiosk}" "${HA_HOST_IP:?set HA_HOST_IP in $ENV_FILE}" "${SATELLITE_NAME:=Living room show}"
+# Check the values before anything is installed; the real files are written further down.
+KIOSK_USER="$KIOSK_USER" HA_HOST_IP="$HA_HOST_IP" "$HERE/render.sh" "$(mktemp -d)" >/dev/null
 
 echo "== Packages"
 apt-get update
@@ -48,12 +50,9 @@ if [[ ! -d /opt/home-show/wyoming-openwakeword ]]; then
   sudo -u "$KIOSK_USER" git clone --depth 1 https://github.com/rhasspy/wyoming-openwakeword /opt/home-show/wyoming-openwakeword
   sudo -u "$KIOSK_USER" bash -c 'cd /opt/home-show/wyoming-openwakeword && script/setup'
 fi
-for unit in home-show-wakeword.service home-show-satellite.service; do
-  sed "s|@USER@|$KIOSK_USER|g" "$HERE/systemd/$unit" > "/etc/systemd/system/$unit"
-done
 
-echo "== Firewall: the satellite port is reachable only from Home Assistant"
-sed "s|@HA_HOST_IP@|$HA_HOST_IP|g" "$HERE/nftables.conf" > /etc/nftables.conf
+echo "== Firewall (the satellite port is reachable only from Home Assistant) and services"
+KIOSK_USER="$KIOSK_USER" HA_HOST_IP="$HA_HOST_IP" "$HERE/render.sh" /
 systemctl enable --now nftables
 
 echo "== Hardening"

@@ -40,4 +40,6 @@ No fallback hotspot, no web server, encrypted API per device, OTA password. The 
 
 ## Checks
 
-CI validates every ESPHome config and shellchecks the Pi scripts. Run `pre-commit install` after cloning.
+CI validates every ESPHome config, shellchecks the Pi scripts and runs the unit tests. Run `pre-commit install` after cloning.
+
+The unit tests in `tests/` check rules every device must follow: its own API key, an encrypted API, an OTA password, no hotspot and no web server. They also render the Pi's firewall and services into a temp dir and check that only Home Assistant's address can reach the satellite port. Run them with `pip install -r requirements-test.txt && pytest`.
