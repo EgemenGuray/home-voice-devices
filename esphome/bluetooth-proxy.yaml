@@ -2,10 +2,12 @@
 substitutions:
   name: bt-proxy-1
   api_key: !secret api_key_bt_proxy_1
+  room: Living room
 
 esphome:
   name: ${name}
   friendly_name: Bluetooth proxy 1
+  area: ${room}
 
 esp32:
   board: esp32dev

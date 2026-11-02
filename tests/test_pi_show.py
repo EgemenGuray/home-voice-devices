@@ -75,3 +75,14 @@ def test_example_env_has_every_setting_the_scripts_read():
         used |= set(re.findall(r"\$\{?([A-Z][A-Z_]+)", path.read_text()))
     used -= {"EUID", "HERE", "ENV_FILE", "KHOME", "TERM", "ROOT", "URL", "WAYLAND_DISPLAY"}
     assert used <= names, f"missing from home-show.env.example: {used - names}"
+
+
+def test_satellite_reports_its_room(tmp_path):
+    """Wyoming passes the area to HA, which uses it as the default target for room commands."""
+    render(tmp_path)
+    sat = (tmp_path / "etc/systemd/system/home-show-satellite.service").read_text()
+    assert '--area "$SATELLITE_AREA"' in sat
+    example = (ROOT / "pi-show/home-show.env.example").read_text()
+    assert re.search(r'^SATELLITE_AREA="[^"]+"$', example, re.M)
+    install = (ROOT / "pi-show/install.sh").read_text()
+    assert "${SATELLITE_AREA:?" in install

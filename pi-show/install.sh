@@ -10,7 +10,7 @@ ENV_FILE=/etc/home-show.env
 [[ -f "$ENV_FILE" ]] || { install -m 600 "$HERE/home-show.env.example" "$ENV_FILE"; echo "Edit $ENV_FILE, then run again."; exit 1; }
 # shellcheck disable=SC1090
 source "$ENV_FILE"
-: "${KIOSK_USER:=kiosk}" "${HA_HOST_IP:?set HA_HOST_IP in $ENV_FILE}" "${SATELLITE_NAME:=Living room show}"
+: "${KIOSK_USER:=kiosk}" "${HA_HOST_IP:?set HA_HOST_IP in $ENV_FILE}" "${SATELLITE_NAME:=Living room show}" "${SATELLITE_AREA:?set SATELLITE_AREA (the room) in $ENV_FILE}"
 # Check the values before anything is installed; the real files are written further down.
 KIOSK_USER="$KIOSK_USER" HA_HOST_IP="$HA_HOST_IP" "$HERE/render.sh" "$(mktemp -d)" >/dev/null
 

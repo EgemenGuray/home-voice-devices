@@ -74,3 +74,12 @@ def test_dot_clock_is_a_thin_satellite():
     # URLs in the config are downloaded at build time; at runtime the device only talks to HA.
     for component in ("http_request", "online_image", "mqtt", "udp"):
         assert component not in conf, component
+
+
+@pytest.mark.parametrize("path", DEVICES, ids=lambda p: p.name)
+def test_device_is_assigned_to_a_room(path):
+    """HA puts the device in this area on adoption, so "turn off the lights" said to it means this room."""
+    conf = load(path)
+    room = conf["substitutions"].get("room")
+    assert isinstance(room, str) and room.strip(), f"{path.name}: set substitutions.room to the HA area"
+    assert conf["esphome"]["area"] == "${room}"

@@ -10,6 +10,7 @@ The devices are the same hardware and firmware in both setups. Only what they ta
 |---|---|---|
 | Dot-style, Show-mini | Assist satellites to HA on the hub Mac | Same. HA uses the Studio's Whisper and Piper, so answers come back faster |
 | Show-style (Pi) | Wyoming satellite to HA on the hub Mac (`pi-show/`) | Devices v2: a LiveKit client to the Studio's voice server, with cards pushed by the agent service (`docs/devices-v2.md`) |
+| Room | Each device carries its HA area (`room` in ESPHome, `SATELLITE_AREA` on the Pi), so "turn off the lights" means its room | Same. On Devices v2 the Pi sends the same area to the voice server |
 | If the Studio is off | Not applicable | Every device falls back to Assist on the hub Mac within 2 s |
 | Install | Flash or run `pi-show/install.sh` with `HA_HOST_IP` = the HA VM | Same first, then the v2 steps in `docs/devices-v2.md` |
 
@@ -32,7 +33,7 @@ cp esphome/secrets.example.yaml esphome/secrets.yaml   # fill from the vault; gi
 esphome run esphome/dot-clock.yaml                     # first time over USB, later over the IoT network
 ```
 
-For each room, copy `dot-clock.yaml` to `dot-<room>.yaml` and change `name`, `friendly_name` and `api_key` in the substitutions; add a matching `api_key_dot_<room>` to `secrets.yaml`. Each device gets its own API key.
+For each room, copy `dot-clock.yaml` to `dot-<room>.yaml` and change `name`, `friendly_name`, `room` and `api_key` in the substitutions. `room` is the HA area name exactly as it is in HA (Settings > Areas); HA puts the device there when you adopt it, and that is what makes "turn off the lights" and "turn off the TV" act on this room only. Add a matching `api_key_dot_<room>` to `secrets.yaml`; each device gets its own API key. If you move a device, change its area in HA too.
 
 ## Security
 
@@ -42,4 +43,4 @@ No fallback hotspot, no web server, encrypted API per device, OTA password. The 
 
 CI validates every ESPHome config, shellchecks the Pi scripts and runs the unit tests. Run `pre-commit install` after cloning.
 
-The unit tests in `tests/` check rules every device must follow: its own API key, an encrypted API, an OTA password, no hotspot and no web server. They also render the Pi's firewall and services into a temp dir and check that only Home Assistant's address can reach the satellite port. Run them with `pip install -r requirements-test.txt && pytest`.
+The unit tests in `tests/` check rules every device must follow: a room, its own API key, an encrypted API, an OTA password, no hotspot and no web server. They also render the Pi's firewall and services into a temp dir and check that only Home Assistant's address can reach the satellite port. Run them with `pip install -r requirements-test.txt && pytest`.
