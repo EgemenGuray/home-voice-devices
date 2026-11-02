@@ -9,6 +9,7 @@ EnvironmentFile=/etc/home-show.env
 WorkingDirectory=/opt/home-show/wyoming-satellite
 ExecStart=/bin/bash -c 'exec script/run \
   --name "$SATELLITE_NAME" \
+  --area "$SATELLITE_AREA" \
   --uri tcp://0.0.0.0:10700 \
   --mic-command "arecord -D $MIC_DEVICE -r 16000 -c 1 -f S16_LE -t raw" \
   --snd-command "aplay -D $SND_DEVICE -r 22050 -c 1 -f S16_LE -t raw" \

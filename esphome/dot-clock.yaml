@@ -7,6 +7,8 @@
 substitutions:
   name: dot-kitchen
   friendly_name: Kitchen voice
+  # The HA area this device sits in. HA uses it as the default target ("turn off the lights" = this room).
+  room: Kitchen
   api_key: !secret api_key_dot_kitchen
   # XVF3800 I2S (the XVF3800 is the I2S clock master)
   mic_bclk: GPIO8
@@ -27,6 +29,7 @@ substitutions:
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
+  area: ${room}
   min_version: 2025.5.0
   on_boot:
     priority: -100
