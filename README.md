@@ -11,6 +11,7 @@ The devices are the same hardware and firmware in both setups. Only what they ta
 | Dot-style, Show-mini | Assist satellites to HA on the hub Mac | Same. HA uses the Studio's Whisper and Piper, so answers come back faster |
 | Show-style (Pi) | Wyoming satellite to HA on the hub Mac (`pi-show/`) | Devices v2: a LiveKit client to the Studio's voice server, with cards pushed by the agent service (`docs/devices-v2.md`) |
 | Room | Each device carries its HA area (`room` in ESPHome, `SATELLITE_AREA` on the Pi), so "turn off the lights" means its room | Same. On Devices v2 the Pi sends the same area to the voice server |
+| Music | "Play music" said to a device plays on its room's music speaker (an AirPlay or other Music Assistant player labelled `music` in HA). A room without one plays on the Dot itself: its media player takes Music Assistant streams and ducks them for the wake sound and answers (home-assistant-config `docs/music.md`). The Pi Show has no media player, so its room needs a labelled speaker | Same; music never goes through the Studio |
 | If the Studio is off | Not applicable | Every device falls back to Assist on the hub Mac within 2 s |
 | Install | Flash or run `pi-show/install.sh` with `HA_HOST_IP` = the HA VM | Same first, then the v2 steps in `docs/devices-v2.md` |
 
