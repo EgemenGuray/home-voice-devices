@@ -83,3 +83,20 @@ def test_device_is_assigned_to_a_room(path):
     room = conf["substitutions"].get("room")
     assert isinstance(room, str) and room.strip(), f"{path.name}: set substitutions.room to the HA area"
     assert conf["esphome"]["area"] == "${room}"
+
+
+VOICE_DEVICES = [p for p in DEVICES if "voice_assistant" in load(p)]
+
+
+@pytest.mark.parametrize("path", VOICE_DEVICES, ids=lambda p: p.name)
+def test_voice_device_can_play_its_rooms_music(path):
+    """A room with no music speaker plays "play music" on its voice device (home-assistant-config packages/music.yaml),
+    so the device must be a media player HA sees, with a music pipeline separate from announcements and ducking."""
+    conf = load(path)
+    [player] = conf["media_player"]
+    assert player["platform"] == "speaker" and player.get("internal") is False
+    media, announce = player["media_pipeline"], player["announcement_pipeline"]
+    assert media["speaker"] != announce["speaker"], "music and answers need their own mixer inputs"
+    assert media["format"] in ("FLAC", "WAV") and media["sample_rate"] >= 44100
+    assert conf["voice_assistant"]["media_player"] == player["id"]
+    assert "mixer_speaker.apply_ducking" in path.read_text(), "music is turned down while the device listens and speaks"
